@@ -1,0 +1,6 @@
+dbt-model-auditor
+
+Rule definitions adapted from dbt-labs/dbt-project-evaluator, Apache License 2.0
+(https://github.com/dbt-labs/dbt-project-evaluator). The rule ideas and default
+thresholds (for example the model fan-out threshold of 3) are adapted; the
+implementation in lib/manifest-rules.ts is original code.

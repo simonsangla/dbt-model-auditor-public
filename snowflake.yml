@@ -1,0 +1,30 @@
+definition_version: "2"
+
+# Every account-specific value comes from the environment, so the same file
+# deploys to any Snowflake account. Set these before running the Snowflake CLI:
+#   APP_DATABASE, APP_SCHEMA         where the app object is created
+#   APP_WAREHOUSE                    warehouse the app's queries run on
+#   APP_CODE_WORKSPACE               fully qualified workspace for the app code
+entities:
+  dbt_model_auditor:
+    type: snowflake-app
+    identifier:
+      name: DBT_MODEL_AUDITOR
+      database: <% ctx.env.APP_DATABASE %>
+      schema: <% ctx.env.APP_SCHEMA %>
+    meta:
+      title: dbt_model_auditor
+    artifacts:
+      - src: ./*
+        dest: ./
+        ignore:
+          - node_modules
+          - .env*
+          - __pycache__
+          - "*.pyc"
+          - .next
+          - .git
+          - snowflake.log
+
+    query_warehouse: <% ctx.env.APP_WAREHOUSE %>
+    code_workspace: <% ctx.env.APP_CODE_WORKSPACE %>

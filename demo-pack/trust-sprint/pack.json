@@ -1,0 +1,52 @@
+{
+  "app": "trust-sprint",
+  "audience": "Head of Data evaluating text-to-SQL or Cortex Analyst for business users",
+  "outcome": "Sees which business questions are safe to hand to AI before rollout, and exactly why the others are not",
+  "length_seconds": 45,
+  "format": "16:9 master, vertical cut, hero PNG",
+  "run": {
+    "command": "npm run dev -- -p 3107",
+    "url": "http://localhost:3107/trust"
+  },
+  "data": {
+    "source": "lib/trust-sample.json",
+    "recorded": true
+  },
+  "scenes": [
+    {
+      "id": "inputs",
+      "route": "/trust",
+      "action": "open the page on section 01 Inputs",
+      "proof": "recorded-run banner, the five metrics of the trust map with owner and status",
+      "caption": "The inputs: five business metrics, each with an owner"
+    },
+    {
+      "id": "evaluation",
+      "route": "/trust",
+      "action": "scroll to 02 Evaluation",
+      "proof": "five business questions with pass, warning and fail, and why",
+      "caption": "Five business questions, run on Snowflake one by one"
+    },
+    {
+      "id": "risk",
+      "route": "/trust",
+      "action": "scroll to 03 Risk matrix",
+      "proof": "score 74, 1 error, 1 warning, the two findings",
+      "caption": "One score for the domain, and exactly what drags it down"
+    },
+    {
+      "id": "recommendations",
+      "route": "/trust",
+      "action": "scroll to 04 Recommendations",
+      "proof": "define Churn Rate first; guard the Coupon Share denominator",
+      "caption": "What to fix before anyone asks the AI"
+    },
+    {
+      "id": "evidence",
+      "route": "/trust",
+      "action": "scroll to 05 Evidence",
+      "proof": "the checks that ran and the downloadable report",
+      "caption": "Every result is traceable to the toolkit run"
+    }
+  ]
+}

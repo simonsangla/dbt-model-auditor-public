@@ -1,0 +1,8 @@
+# SEEDED DEFECTS for the dbt Model Auditor demo - not part of dbt-labs/jaffle-shop-classic.
+version: 2
+sources:
+  - name: jaffle_raw
+    database: "{{ target.database }}"
+    schema: "{{ target.schema }}"
+    tables:
+      - name: raw_payments

@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "source": "Recorded run on Snowflake: public dbt jaffle-shop, 2 defects seeded for the demo (Coupon Share has no zero-guard; the churn question has no metric)",
+  "synthetic": false,
+  "generated_by": "validation_harness.py --trust-map trust_map.csv --questions question_pack.csv --snowflake-config trust-sf.yaml --semantic-view JAFFLE_SHOP.TRUST_ORDERS --source 'Recorded run on Snowflake: public dbt jaffle-shop, 2 defects seeded for the demo (Coupon Share has no zero-guard; the churn question has no metric)' --json trust-sample.json",
+  "metrics": [
+    {
+      "name": "Total Orders",
+      "definition": "Count of orders placed",
+      "grain": "Daily",
+      "owner": "Head of Analytics",
+      "metric_type": "simple",
+      "status": "verified"
+    },
+    {
+      "name": "Gross Revenue",
+      "definition": "Sum of order amounts before returns",
+      "grain": "Daily",
+      "owner": "Finance Lead",
+      "metric_type": "simple",
+      "status": "verified"
+    },
+    {
+      "name": "Active Customers",
+      "definition": "Customers with at least one order",
+      "grain": "Daily",
+      "owner": "Growth Lead",
+      "metric_type": "simple",
+      "status": "verified"
+    },
+    {
+      "name": "Average Order Value",
+      "definition": "Gross revenue per order",
+      "grain": "Daily",
+      "owner": "Finance Lead",
+      "metric_type": "ratio",
+      "status": "verified"
+    },
+    {
+      "name": "Coupon Share",
+      "definition": "Share of revenue paid with coupons",
+      "grain": "Daily",
+      "owner": "Growth Lead",
+      "metric_type": "ratio",
+      "status": "warning"
+    }
+  ],
+  "questions": [
+    {
+      "question": "How many orders did we take each day?",
+      "metric": "Total Orders",
+      "outcome": "pass",
+      "message": "Count orders per day"
+    },
+    {
+      "question": "What was gross revenue by order status?",
+      "metric": "Gross Revenue",
+      "outcome": "pass",
+      "message": "Sum order amounts per status"
+    },
+    {
+      "question": "What is our average order value by day?",
+      "metric": "Average Order Value",
+      "outcome": "pass",
+      "message": "Zero-guarded ratio per day"
+    },
+    {
+      "question": "What share of revenue came from coupons?",
+      "metric": "Coupon Share",
+      "outcome": "warning",
+      "message": "ratio metric 'Coupon Share' divides without a NULLIF/COALESCE zero-guard"
+    },
+    {
+      "question": "What is our customer churn rate?",
+      "metric": "Churn Rate",
+      "outcome": "fail",
+      "message": "Missing metrics in trust map: Churn Rate"
+    }
+  ]
+}

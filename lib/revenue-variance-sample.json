@@ -1,0 +1,836 @@
+{
+ "note": "Trimmed real dbt manifest of the public dbt-revenue-variance-demo (dbt-duckdb), parsed with --vars {audit_demo: true}: the 5 committed models plus 4 planted-defect models (models/audit_demo, disabled by default). Plus the demo dashboard exposure revenue_variance_review (models/marts/_exposures.yml); the proof exposures are trimmed. Manifest-only sample: no Snowflake queries recorded.",
+ "source": {
+  "project": "dbt-revenue-variance-demo (public GitHub repo)",
+  "commit": "01c2eec+audit_demo+exposure",
+  "adapter": "duckdb",
+  "dbtVersion": "1.12.2",
+  "parsedAt": "2026-10-13",
+  "vars": {
+   "audit_demo": true
+  }
+ },
+ "manifest": {
+  "nodes": {
+   "model.revenue_variance.stg_products": {
+    "unique_id": "model.revenue_variance.stg_products",
+    "name": "stg_products",
+    "resource_type": "model",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "stg_products",
+    "description": "Product dimension.",
+    "depends_on": {
+     "nodes": [
+      "seed.revenue_variance.products"
+     ]
+    },
+    "columns": {
+     "product_id": {
+      "name": "product_id",
+      "description": ""
+     },
+     "category": {
+      "name": "category",
+      "description": ""
+     }
+    },
+    "config": {
+     "materialized": "view"
+    }
+   },
+   "model.revenue_variance.stg_orders": {
+    "unique_id": "model.revenue_variance.stg_orders",
+    "name": "stg_orders",
+    "resource_type": "model",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "stg_orders",
+    "description": "Completed order lines from the fictional orders seed; refunds excluded.",
+    "depends_on": {
+     "nodes": [
+      "seed.revenue_variance.orders"
+     ]
+    },
+    "columns": {
+     "order_id": {
+      "name": "order_id",
+      "description": "Order line key."
+     },
+     "product_id": {
+      "name": "product_id",
+      "description": ""
+     },
+     "revenue": {
+      "name": "revenue",
+      "description": "quantity * unit_price."
+     }
+    },
+    "config": {
+     "materialized": "view"
+    }
+   },
+   "model.revenue_variance.stg_budget": {
+    "unique_id": "model.revenue_variance.stg_budget",
+    "name": "stg_budget",
+    "resource_type": "model",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "stg_budget",
+    "description": "Monthly unit and price budget per product.",
+    "depends_on": {
+     "nodes": [
+      "seed.revenue_variance.budget"
+     ]
+    },
+    "columns": {
+     "budget_month": {
+      "name": "budget_month",
+      "description": ""
+     },
+     "product_id": {
+      "name": "product_id",
+      "description": ""
+     }
+    },
+    "config": {
+     "materialized": "view"
+    }
+   },
+   "model.revenue_variance.fct_monthly_revenue": {
+    "unique_id": "model.revenue_variance.fct_monthly_revenue",
+    "name": "fct_monthly_revenue",
+    "resource_type": "model",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "fct_monthly_revenue",
+    "description": "Actual units and revenue per month and product.",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_orders"
+     ]
+    },
+    "columns": {
+     "order_month": {
+      "name": "order_month",
+      "description": ""
+     },
+     "actual_revenue": {
+      "name": "actual_revenue",
+      "description": ""
+     }
+    },
+    "config": {
+     "materialized": "table"
+    }
+   },
+   "model.revenue_variance.fct_revenue_variance": {
+    "unique_id": "model.revenue_variance.fct_revenue_variance",
+    "name": "fct_revenue_variance",
+    "resource_type": "model",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "fct_revenue_variance",
+    "description": "Budget vs actual revenue per month and product, decomposed into a volume effect (unit gap at budget price) and a price effect (realised price gap on actual units). The two effects sum exactly to the total variance - see the singular test assert_variance_bridge_reconciles.\n",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_budget",
+      "model.revenue_variance.fct_monthly_revenue",
+      "model.revenue_variance.stg_products"
+     ]
+    },
+    "columns": {
+     "month": {
+      "name": "month",
+      "description": ""
+     },
+     "total_variance": {
+      "name": "total_variance",
+      "description": "actual_revenue - budget_revenue."
+     },
+     "volume_effect": {
+      "name": "volume_effect",
+      "description": "(actual_units - budget_units) * budget_price."
+     },
+     "price_effect": {
+      "name": "price_effect",
+      "description": "actual_revenue - actual_units * budget_price."
+     }
+    },
+    "config": {
+     "materialized": "table"
+    }
+   },
+   "model.revenue_variance.rpt_budget_gap": {
+    "unique_id": "model.revenue_variance.rpt_budget_gap",
+    "name": "rpt_budget_gap",
+    "resource_type": "model",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "rpt_budget_gap",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.fct_revenue_variance"
+     ]
+    },
+    "columns": {
+     "month": {
+      "name": "month",
+      "description": ""
+     }
+    },
+    "config": {
+     "materialized": "view"
+    }
+   },
+   "model.revenue_variance.customer_ltv": {
+    "unique_id": "model.revenue_variance.customer_ltv",
+    "name": "customer_ltv",
+    "resource_type": "model",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "customer_ltv",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "source.revenue_variance.raw.orders"
+     ]
+    },
+    "columns": {},
+    "config": {
+     "materialized": "view"
+    }
+   },
+   "model.revenue_variance.int_orders_enriched": {
+    "unique_id": "model.revenue_variance.int_orders_enriched",
+    "name": "int_orders_enriched",
+    "resource_type": "model",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "int_orders_enriched",
+    "description": "Order lines joined to the product dimension (planted defect - no tests).",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_orders",
+      "model.revenue_variance.stg_products"
+     ]
+    },
+    "columns": {},
+    "config": {
+     "materialized": "view"
+    }
+   },
+   "model.revenue_variance.legacy_margin": {
+    "unique_id": "model.revenue_variance.legacy_margin",
+    "name": "legacy_margin",
+    "resource_type": "model",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "legacy_margin",
+    "description": "Monthly revenue per product kept under a legacy name (planted defect - naming).",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.fct_monthly_revenue"
+     ]
+    },
+    "columns": {
+     "order_month": {
+      "name": "order_month",
+      "description": ""
+     }
+    },
+    "config": {
+     "materialized": "view"
+    }
+   },
+   "test.revenue_variance.assert_variance_grain_matches_budget": {
+    "unique_id": "test.revenue_variance.assert_variance_grain_matches_budget",
+    "name": "assert_variance_grain_matches_budget",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "assert_variance_grain_matches_budget",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_budget",
+      "model.revenue_variance.fct_revenue_variance"
+     ]
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.assert_variance_bridge_reconciles": {
+    "unique_id": "test.revenue_variance.assert_variance_bridge_reconciles",
+    "name": "assert_variance_bridge_reconciles",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "assert_variance_bridge_reconciles",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.fct_revenue_variance"
+     ]
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "seed.revenue_variance.products": {
+    "unique_id": "seed.revenue_variance.products",
+    "name": "products",
+    "resource_type": "seed",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "products",
+    "description": "",
+    "depends_on": {
+     "nodes": []
+    },
+    "columns": {},
+    "config": {
+     "materialized": "seed"
+    }
+   },
+   "seed.revenue_variance.orders": {
+    "unique_id": "seed.revenue_variance.orders",
+    "name": "orders",
+    "resource_type": "seed",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "orders",
+    "description": "",
+    "depends_on": {
+     "nodes": []
+    },
+    "columns": {},
+    "config": {
+     "materialized": "seed"
+    }
+   },
+   "seed.revenue_variance.budget": {
+    "unique_id": "seed.revenue_variance.budget",
+    "name": "budget",
+    "resource_type": "seed",
+    "schema": "main",
+    "database": "revenue_variance",
+    "alias": "budget",
+    "description": "",
+    "depends_on": {
+     "nodes": []
+    },
+    "columns": {},
+    "config": {
+     "materialized": "seed"
+    }
+   },
+   "test.revenue_variance.unique_stg_orders_order_id.e3b841c71a": {
+    "unique_id": "test.revenue_variance.unique_stg_orders_order_id.e3b841c71a",
+    "name": "unique_stg_orders_order_id",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "unique_stg_orders_order_id",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_orders"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_orders",
+    "test_metadata": {
+     "name": "unique",
+     "kwargs": {
+      "column_name": "order_id",
+      "model": "{{ get_where_subquery(ref('stg_orders')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_stg_orders_order_id.81cfe2fe64": {
+    "unique_id": "test.revenue_variance.not_null_stg_orders_order_id.81cfe2fe64",
+    "name": "not_null_stg_orders_order_id",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_stg_orders_order_id",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_orders"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_orders",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "order_id",
+      "model": "{{ get_where_subquery(ref('stg_orders')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_stg_orders_product_id.034adb910e": {
+    "unique_id": "test.revenue_variance.not_null_stg_orders_product_id.034adb910e",
+    "name": "not_null_stg_orders_product_id",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_stg_orders_product_id",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_orders"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_orders",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "product_id",
+      "model": "{{ get_where_subquery(ref('stg_orders')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.relationships_stg_orders_product_id__product_id__ref_stg_products_.9f9d411d80": {
+    "unique_id": "test.revenue_variance.relationships_stg_orders_product_id__product_id__ref_stg_products_.9f9d411d80",
+    "name": "relationships_stg_orders_product_id__product_id__ref_stg_products_",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "relationships_stg_orders_25711d7165ca7dae190829aae03ddf38",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_products",
+      "model.revenue_variance.stg_orders"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_orders",
+    "test_metadata": {
+     "name": "relationships",
+     "kwargs": {
+      "column_name": "product_id",
+      "to": "ref('stg_products')",
+      "field": "product_id",
+      "model": "{{ get_where_subquery(ref('stg_orders')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_stg_orders_revenue.c12e81f4ae": {
+    "unique_id": "test.revenue_variance.not_null_stg_orders_revenue.c12e81f4ae",
+    "name": "not_null_stg_orders_revenue",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_stg_orders_revenue",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_orders"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_orders",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "revenue",
+      "model": "{{ get_where_subquery(ref('stg_orders')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_stg_budget_budget_month.18e61f2f75": {
+    "unique_id": "test.revenue_variance.not_null_stg_budget_budget_month.18e61f2f75",
+    "name": "not_null_stg_budget_budget_month",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_stg_budget_budget_month",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_budget"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_budget",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "budget_month",
+      "model": "{{ get_where_subquery(ref('stg_budget')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_stg_budget_product_id.6faca46c15": {
+    "unique_id": "test.revenue_variance.not_null_stg_budget_product_id.6faca46c15",
+    "name": "not_null_stg_budget_product_id",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_stg_budget_product_id",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_budget"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_budget",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "product_id",
+      "model": "{{ get_where_subquery(ref('stg_budget')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.relationships_stg_budget_product_id__product_id__ref_stg_products_.a147f5af3f": {
+    "unique_id": "test.revenue_variance.relationships_stg_budget_product_id__product_id__ref_stg_products_.a147f5af3f",
+    "name": "relationships_stg_budget_product_id__product_id__ref_stg_products_",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "relationships_stg_budget_eafb3dd74f7c81963b061f8ccb06a97d",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_products",
+      "model.revenue_variance.stg_budget"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_budget",
+    "test_metadata": {
+     "name": "relationships",
+     "kwargs": {
+      "column_name": "product_id",
+      "to": "ref('stg_products')",
+      "field": "product_id",
+      "model": "{{ get_where_subquery(ref('stg_budget')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.dbt_utils_free_unique_combo_stg_budget_budget_month_product_id.3276e25eea": {
+    "unique_id": "test.revenue_variance.dbt_utils_free_unique_combo_stg_budget_budget_month_product_id.3276e25eea",
+    "name": "dbt_utils_free_unique_combo_stg_budget_budget_month_product_id",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "dbt_utils_free_unique_combo_stg_budget_budget_month_product_id",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_budget"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_budget",
+    "test_metadata": {
+     "name": "dbt_utils_free_unique_combo",
+     "kwargs": {
+      "columns": "budget_month || '-' || product_id",
+      "model": "{{ get_where_subquery(ref('stg_budget')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.unique_stg_products_product_id.7d950a1467": {
+    "unique_id": "test.revenue_variance.unique_stg_products_product_id.7d950a1467",
+    "name": "unique_stg_products_product_id",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "unique_stg_products_product_id",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_products"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_products",
+    "test_metadata": {
+     "name": "unique",
+     "kwargs": {
+      "column_name": "product_id",
+      "model": "{{ get_where_subquery(ref('stg_products')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_stg_products_product_id.6373b0acf3": {
+    "unique_id": "test.revenue_variance.not_null_stg_products_product_id.6373b0acf3",
+    "name": "not_null_stg_products_product_id",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_stg_products_product_id",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_products"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_products",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "product_id",
+      "model": "{{ get_where_subquery(ref('stg_products')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.accepted_values_stg_products_category__subscription__services__add_on.671fec1541": {
+    "unique_id": "test.revenue_variance.accepted_values_stg_products_category__subscription__services__add_on.671fec1541",
+    "name": "accepted_values_stg_products_category__subscription__services__add_on",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "accepted_values_stg_products_88a736942f79d188a33572e79798a75f",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.stg_products"
+     ]
+    },
+    "attached_node": "model.revenue_variance.stg_products",
+    "test_metadata": {
+     "name": "accepted_values",
+     "kwargs": {
+      "column_name": "category",
+      "values": [
+       "subscription",
+       "services",
+       "add_on"
+      ],
+      "model": "{{ get_where_subquery(ref('stg_products')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_fct_monthly_revenue_order_month.31613066e0": {
+    "unique_id": "test.revenue_variance.not_null_fct_monthly_revenue_order_month.31613066e0",
+    "name": "not_null_fct_monthly_revenue_order_month",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_fct_monthly_revenue_order_month",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.fct_monthly_revenue"
+     ]
+    },
+    "attached_node": "model.revenue_variance.fct_monthly_revenue",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "order_month",
+      "model": "{{ get_where_subquery(ref('fct_monthly_revenue')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_fct_monthly_revenue_actual_revenue.d1843fdb9d": {
+    "unique_id": "test.revenue_variance.not_null_fct_monthly_revenue_actual_revenue.d1843fdb9d",
+    "name": "not_null_fct_monthly_revenue_actual_revenue",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_fct_monthly_revenue_actual_revenue",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.fct_monthly_revenue"
+     ]
+    },
+    "attached_node": "model.revenue_variance.fct_monthly_revenue",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "actual_revenue",
+      "model": "{{ get_where_subquery(ref('fct_monthly_revenue')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_fct_revenue_variance_month.f4af41a165": {
+    "unique_id": "test.revenue_variance.not_null_fct_revenue_variance_month.f4af41a165",
+    "name": "not_null_fct_revenue_variance_month",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_fct_revenue_variance_month",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.fct_revenue_variance"
+     ]
+    },
+    "attached_node": "model.revenue_variance.fct_revenue_variance",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "month",
+      "model": "{{ get_where_subquery(ref('fct_revenue_variance')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_rpt_budget_gap_month.4ea55629b7": {
+    "unique_id": "test.revenue_variance.not_null_rpt_budget_gap_month.4ea55629b7",
+    "name": "not_null_rpt_budget_gap_month",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_rpt_budget_gap_month",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.rpt_budget_gap"
+     ]
+    },
+    "attached_node": "model.revenue_variance.rpt_budget_gap",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "month",
+      "model": "{{ get_where_subquery(ref('rpt_budget_gap')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   },
+   "test.revenue_variance.not_null_legacy_margin_order_month.2b65caf896": {
+    "unique_id": "test.revenue_variance.not_null_legacy_margin_order_month.2b65caf896",
+    "name": "not_null_legacy_margin_order_month",
+    "resource_type": "test",
+    "schema": "main_dbt_test__audit",
+    "database": "revenue_variance",
+    "alias": "not_null_legacy_margin_order_month",
+    "description": "",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.legacy_margin"
+     ]
+    },
+    "attached_node": "model.revenue_variance.legacy_margin",
+    "test_metadata": {
+     "name": "not_null",
+     "kwargs": {
+      "column_name": "order_month",
+      "model": "{{ get_where_subquery(ref('legacy_margin')) }}"
+     },
+     "namespace": null
+    },
+    "columns": {},
+    "config": {
+     "materialized": "test"
+    }
+   }
+  },
+  "sources": {
+   "source.revenue_variance.raw.orders": {
+    "unique_id": "source.revenue_variance.raw.orders",
+    "name": "orders",
+    "source_name": "raw",
+    "freshness": {
+     "warn_after": {
+      "count": null,
+      "period": null
+     },
+     "error_after": {
+      "count": null,
+      "period": null
+     }
+    }
+   }
+  },
+  "exposures": {
+   "exposure.revenue_variance.revenue_variance_review": {
+    "unique_id": "exposure.revenue_variance.revenue_variance_review",
+    "name": "revenue_variance_review",
+    "label": "Monthly revenue variance review",
+    "type": "dashboard",
+    "description": "Monthly finance review of actual vs budget revenue by product category. Reads the variance mart and the monthly revenue mart.",
+    "depends_on": {
+     "nodes": [
+      "model.revenue_variance.fct_revenue_variance",
+      "model.revenue_variance.fct_monthly_revenue"
+     ]
+    }
+   }
+  }
+ }
+}

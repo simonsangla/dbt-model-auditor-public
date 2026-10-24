@@ -1,0 +1,6 @@
+question,metrics,dimensions,expected_behavior
+"How many orders did we take each day?",Total Orders,Order Date,Count orders per day
+"What was gross revenue by order status?",Gross Revenue,Status,Sum order amounts per status
+"What is our average order value by day?",Average Order Value,Order Date,Zero-guarded ratio per day
+"What share of revenue came from coupons?",Coupon Share,Status,SEEDED DEFECT for the demo: ratio without a zero-guard
+"What is our customer churn rate?",Churn Rate,Order Date,SEEDED DEFECT for the demo: no churn metric in the trust map

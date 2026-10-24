@@ -1,0 +1,6 @@
+metric_name,definition,grain,filters,owner,caveats,sql_expression,metric_type
+Total Orders,Count of orders placed,Daily,,Head of Analytics,Includes returned orders,COUNT(order_id),simple
+Gross Revenue,Sum of order amounts before returns,Daily,,Finance Lead,Returned orders are still counted,SUM(amount),simple
+Active Customers,Customers with at least one order,Daily,,Growth Lead,,COUNT(DISTINCT customer_id),simple
+Average Order Value,Gross revenue per order,Daily,,Finance Lead,Denominator zero-guarded,"SUM(amount) / NULLIF(COUNT(order_id), 0)",ratio
+Coupon Share,Share of revenue paid with coupons,Daily,,Growth Lead,SEEDED DEFECT for the demo: denominator not zero-guarded,SUM(coupon_amount) / SUM(amount),ratio
