@@ -1,5 +1,9 @@
 node_modules/
 .next/
+dist/
+build/
+out/
+coverage/
 .env
 .env.local
 .env.*.local
