@@ -124,7 +124,7 @@ describe("readTomlDefaultConnection", () => {
         [prod]
         account = "myaccount"
         user = "myuser"
-        password = "mypass"
+        password = "YOUR_PASSWORD_HERE"
         warehouse = "mywh"
       `,
     })
@@ -143,7 +143,7 @@ describe("readTomlDefaultConnection", () => {
         [connections.legacy]
         account = "legacy-acct"
         user = "legacy-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -159,13 +159,13 @@ describe("readTomlDefaultConnection", () => {
         [modern]
         account = "modern-acct"
         user = "modern-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
       [path.join(HOME, ".snowflake", "config.toml")]: `
         [connections.legacy]
         account = "legacy-acct"
         user = "legacy-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -180,11 +180,11 @@ describe("readTomlDefaultConnection", () => {
         [alpha]
         account = "alpha-acct"
         user = "alpha-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
         [beta]
         account = "beta-acct"
         user = "beta-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
       [path.join(HOME, ".snowflake", "config.toml")]: `
         default_connection_name = "beta"
@@ -205,11 +205,11 @@ describe("readTomlDefaultConnection", () => {
         [first]
         account = "first-acct"
         user = "first-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
         [second]
         account = "second-acct"
         user = "second-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -225,7 +225,7 @@ describe("readTomlDefaultConnection", () => {
         [myconn]
         account = "fallback-acct"
         user = "fallback-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -250,7 +250,7 @@ describe("readTomlDefaultConnection", () => {
         [connections.prod]
         account = "nested-acct"
         user = "nested-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -266,11 +266,11 @@ describe("readTomlDefaultConnection", () => {
         [test]
         account = "legacy-acct"
         user = "legacy-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
         [connections.test]
         account = "nested-acct"
         user = "nested-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -286,11 +286,11 @@ describe("readTomlDefaultConnection", () => {
         [legacy_conn]
         account = "legacy-acct"
         user = "legacy-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
         [connections.new_conn]
         account = "new-acct"
         user = "new-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -307,7 +307,7 @@ describe("readTomlDefaultConnection", () => {
         [myconn]
         account = "custom-home-acct"
         user = "custom-home-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -322,7 +322,7 @@ describe("readTomlDefaultConnection", () => {
         [cached]
         account = "cached-acct"
         user = "cached-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -341,7 +341,7 @@ describe("readTomlDefaultConnection", () => {
         [v1]
         account = "v1-acct"
         user = "v1-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -355,7 +355,7 @@ describe("readTomlDefaultConnection", () => {
         [v2]
         account = "v2-acct"
         user = "v2-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -373,7 +373,7 @@ describe("readTomlDefaultConnection", () => {
         [myconn]
         account = "file-acct"
         user = "file-user"
-        password = "dummy"
+        password = "YOUR_SECRET_HERE"
       `,
     })
 
@@ -483,13 +483,13 @@ describe("querySnowflake: retry on terminated connection", () => {
           ...actual,
           existsSync: (p: string) => p === "/snowflake/session/token" || actual.existsSync(p),
           readFileSync: (p: string, ...args: unknown[]) => {
-            if (p === "/snowflake/session/token") return "fake-spcs-token"
+            if (p === "/snowflake/session/token") return "YOUR_TOKEN_HERE"
             return (actual.readFileSync as (...a: unknown[]) => unknown)(p, ...args)
           },
         },
         existsSync: (p: string) => p === "/snowflake/session/token" || actual.existsSync(p),
         readFileSync: (p: string, ...args: unknown[]) => {
-          if (p === "/snowflake/session/token") return "fake-spcs-token"
+          if (p === "/snowflake/session/token") return "YOUR_TOKEN_HERE"
           return (actual.readFileSync as (...a: unknown[]) => unknown)(p, ...args)
         },
       }
@@ -639,7 +639,7 @@ describe("querySnowflake: dev/preview ignores callersRights", () => {
       const actual = require("fs") as typeof import("fs")
       const read = (p: string, ...args: unknown[]) =>
         p === "/snowflake/session/token"
-          ? "fake-spcs-token"
+          ? "YOUR_TOKEN_HERE"
           : (actual.readFileSync as (...a: unknown[]) => unknown)(p, ...args)
       const exists = (p: string) => p === "/snowflake/session/token" || actual.existsSync(p)
       return {
@@ -710,7 +710,7 @@ describe("querySnowflake: warns in local dev when callersRights requested", () =
     // Local dev: dev mode, password creds, and no SPCS service token.
     Reflect.set(process.env, "NODE_ENV", "development")
     process.env.SNOWFLAKE_USER = "dev-user"
-    process.env.SNOWFLAKE_PASSWORD = "dummy"
+    process.env.SNOWFLAKE_PASSWORD = "YOUR_SECRET_HERE"
 
     vi.doMock("fs", () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -915,30 +915,30 @@ describe("getSecret", () => {
     it("reads mounted /secrets/<name>/username and /password (SPCS)", () => {
       setupFiles({
         "/secrets/DB_CREDS/username": "svc_user\n",
-        "/secrets/DB_CREDS/password": "dummy\n",
+        "/secrets/DB_CREDS/password": "YOUR_SECRET_HERE\n",
       })
       expect(getSecret("DB_CREDS", SecretType.PASSWORD)).toEqual({
         username: "svc_user",
-        password: "dummy",
+        password: "YOUR_SECRET_HERE",
       })
     })
 
     it("falls back to USERNAME and PASSWORD env vars when no files are mounted", () => {
       setupFiles({})
       process.env.SNOWFLAKE_SECRET_DB_CREDS_USERNAME = "svc_user"
-      process.env.SNOWFLAKE_SECRET_DB_CREDS_PASSWORD = "dummy"
+      process.env.SNOWFLAKE_SECRET_DB_CREDS_PASSWORD = "YOUR_SECRET_HERE"
       expect(getSecret("DB_CREDS", SecretType.PASSWORD)).toEqual({
         username: "svc_user",
-        password: "dummy",
+        password: "YOUR_SECRET_HERE",
       })
     })
 
     it("mixes a mounted username with an env-var password fallback", () => {
       setupFiles({ "/secrets/DB_CREDS/username": "file_user" })
-      process.env.SNOWFLAKE_SECRET_DB_CREDS_PASSWORD = "dummy"
+      process.env.SNOWFLAKE_SECRET_DB_CREDS_PASSWORD = "YOUR_SECRET_HERE"
       expect(getSecret("DB_CREDS", SecretType.PASSWORD)).toEqual({
         username: "file_user",
-        password: "dummy",
+        password: "YOUR_SECRET_HERE",
       })
     })
 
@@ -973,11 +973,11 @@ describe("getSecret", () => {
     })
 
     it("reads the mounted /secrets/<name>/access_token in SPCS (no token fetch)", async () => {
-      setupFiles({ "/secrets/OAUTH_SPCS/access_token": "dummy\n" })
+      setupFiles({ "/secrets/OAUTH_SPCS/access_token": "YOUR_SECRET_HERE\n" })
       const fetchMock = vi.fn()
       vi.stubGlobal("fetch", fetchMock)
 
-      await expect(getSecret("OAUTH_SPCS", SecretType.OAUTH2)).resolves.toBe("dummy")
+      await expect(getSecret("OAUTH_SPCS", SecretType.OAUTH2)).resolves.toBe("YOUR_SECRET_HERE")
       expect(fetchMock).not.toHaveBeenCalled()
     })
 
@@ -992,12 +992,12 @@ describe("getSecret", () => {
         ok: true,
         status: 200,
         statusText: "OK",
-        json: async () => ({ access_token: "dummy", expires_in: 3600 }),
+        json: async () => ({ access_token: "YOUR_SECRET_HERE", expires_in: 3600 }),
         text: async () => "",
       })
       vi.stubGlobal("fetch", fetchMock)
 
-      await expect(getSecret("OAUTH_CC", SecretType.OAUTH2)).resolves.toBe("dummy")
+      await expect(getSecret("OAUTH_CC", SecretType.OAUTH2)).resolves.toBe("YOUR_SECRET_HERE")
       expect(fetchMock).toHaveBeenCalledTimes(1)
 
       // The POST body carries the client-credentials grant + configured client/scope.
@@ -1020,25 +1020,25 @@ describe("getSecret", () => {
         ok: true,
         status: 200,
         statusText: "OK",
-        json: async () => ({ access_token: "dummy", expires_in: 3600 }),
+        json: async () => ({ access_token: "YOUR_SECRET_HERE", expires_in: 3600 }),
         text: async () => "",
       })
       vi.stubGlobal("fetch", fetchMock)
 
       const first = await getSecret("OAUTH_CACHE", SecretType.OAUTH2)
       const second = await getSecret("OAUTH_CACHE", SecretType.OAUTH2)
-      expect(first).toBe("dummy")
-      expect(second).toBe("dummy")
+      expect(first).toBe("YOUR_SECRET_HERE")
+      expect(second).toBe("YOUR_SECRET_HERE")
       expect(fetchMock).toHaveBeenCalledTimes(1)
     })
 
     it("falls back to a static SNOWFLAKE_SECRET_<NAME>_ACCESS_TOKEN when no token URL is set", async () => {
       setupFiles({})
-      process.env.SNOWFLAKE_SECRET_OAUTH_STATIC_ACCESS_TOKEN = "dummy"
+      process.env.SNOWFLAKE_SECRET_OAUTH_STATIC_ACCESS_TOKEN = "YOUR_SECRET_HERE"
       const fetchMock = vi.fn()
       vi.stubGlobal("fetch", fetchMock)
 
-      await expect(getSecret("OAUTH_STATIC", SecretType.OAUTH2)).resolves.toBe("dummy")
+      await expect(getSecret("OAUTH_STATIC", SecretType.OAUTH2)).resolves.toBe("YOUR_SECRET_HERE")
       expect(fetchMock).not.toHaveBeenCalled()
     })
 
