@@ -985,7 +985,7 @@ describe("getSecret", () => {
       setupFiles({})
       process.env.SNOWFLAKE_SECRET_OAUTH_CC_OAUTH_TOKEN_URL = "https://provider.example.com/token"
       process.env.SNOWFLAKE_SECRET_OAUTH_CC_OAUTH_CLIENT_ID = "cid"
-      process.env.SNOWFLAKE_SECRET_OAUTH_CC_OAUTH_CLIENT_SECRET = "csecret"
+      process.env.SNOWFLAKE_SECRET_OAUTH_CC_OAUTH_CLIENT_SECRET = "YOUR_SECRET_HERE"
       process.env.SNOWFLAKE_SECRET_OAUTH_CC_OAUTH_SCOPE = "api.read"
 
       const fetchMock = vi.fn().mockResolvedValue({
@@ -1014,7 +1014,7 @@ describe("getSecret", () => {
       setupFiles({})
       process.env.SNOWFLAKE_SECRET_OAUTH_CACHE_OAUTH_TOKEN_URL = "https://provider.example.com/token"
       process.env.SNOWFLAKE_SECRET_OAUTH_CACHE_OAUTH_CLIENT_ID = "cid"
-      process.env.SNOWFLAKE_SECRET_OAUTH_CACHE_OAUTH_CLIENT_SECRET = "csecret"
+      process.env.SNOWFLAKE_SECRET_OAUTH_CACHE_OAUTH_CLIENT_SECRET = "YOUR_SECRET_HERE"
 
       const fetchMock = vi.fn().mockResolvedValue({
         ok: true,
