@@ -35,6 +35,13 @@ describe("audit-engine", () => {
     expect(computeScore(findings, 2)).toBe(35)
   })
 
+  it("ignores unscored findings: they fail their check without moving the score", () => {
+    const scored = [{ rule: "missing-clustering", severity: "warning" as const, message: "No cluster" }]
+    const unscored = [{ rule: "shared-column-description", severity: "warning" as const, message: "confirm", unscored: true }]
+    expect(computeScore([...scored, ...unscored, ...unscored], 2)).toBe(computeScore(scored, 2))
+    expect(computeScore(unscored, 1)).toBe(100)
+  })
+
   it("executes rules via queryFn and aggregates findings and models", async () => {
     const queryFn = vi.fn().mockImplementation(async (sql: string) => {
       if (sql.includes(".TABLES") && sql.includes("CLUSTERING_KEY")) {

@@ -62,13 +62,18 @@ const nodes = Object.fromEntries(
     .map(([id, n]) => {
       const t = Object.fromEntries(keep.filter((k) => n[k] !== undefined).map((k) => [k, n[k]]))
       if (t.depends_on) t.depends_on = { nodes: t.depends_on.nodes ?? [] }
-      if (t.columns) t.columns = Object.fromEntries(Object.entries(t.columns).map(([c, v]) => [c, { name: v.name, description: v.description }]))
+      // `meta` is kept so the recorded manifest can carry a human's shared_meaning_confirmed flag (lib/column-semantics.ts).
+      if (t.columns) t.columns = Object.fromEntries(Object.entries(t.columns).map(([c, v]) => [c, { name: v.name, description: v.description, ...(v.meta && Object.keys(v.meta).length ? { meta: v.meta } : {}) }]))
       if (n.config?.materialized) t.config = { materialized: n.config.materialized }
       return [id, t]
     }),
 )
 const sources = Object.fromEntries(
   Object.entries(full.sources ?? {}).map(([id, s]) => [id, { unique_id: s.unique_id, name: s.name, source_name: s.source_name }]),
+)
+// Doc blocks: lets the shared-column rule attribute an identical description to its {% docs %} block (evidence only).
+const docs = Object.fromEntries(
+  Object.entries(full.docs ?? {}).map(([id, d]) => [id, { name: d.name, block_contents: d.block_contents }]),
 )
 
 const snapshot = {
@@ -78,7 +83,7 @@ const snapshot = {
   config,
   expected: { totalModels: result.totalModels, errors: result.errors, warnings: result.warnings, infos: result.infos, score: result.score, checks: result.checks.map((c) => `${c.rule}:${c.status}`) },
   queries,
-  manifest: { nodes, sources },
+  manifest: { nodes, sources, docs },
 }
 const renames = (args.rename ?? "").split(",").filter(Boolean).map((pair) => pair.split("="))
 let text = JSON.stringify({ ...snapshot, renamed: renames.length > 0 }, null, 1)

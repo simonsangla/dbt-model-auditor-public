@@ -21,6 +21,12 @@ export interface AuditFinding {
   detail?: string
   fixSnippet?: string
   category?: "Data Integrity" | "Snowflake Cost" | "dbt Architecture" | "Governance"
+  /**
+   * True when the finding fails its check but must not move the score: it reports
+   * something a human has to confirm, not a measured defect. Counted in the
+   * errors/warnings totals, ignored by computeScore().
+   */
+  unscored?: boolean
 }
 
 export interface ModelInfo {
@@ -80,8 +86,9 @@ function toIso(val: unknown): string | null {
 
 export function computeScore(findings: AuditFinding[], totalModels: number): number | null {
   if (totalModels === 0) return null
-  const errors = findings.filter((f) => f.severity === "error").length
-  const warnings = findings.filter((f) => f.severity === "warning").length
+  const scored = findings.filter((f) => !f.unscored)
+  const errors = scored.filter((f) => f.severity === "error").length
+  const warnings = scored.filter((f) => f.severity === "warning").length
   const penalty = (errors * 10 + warnings * 3) / totalModels
   return Math.max(0, Math.round(100 - penalty * 10))
 }

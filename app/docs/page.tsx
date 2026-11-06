@@ -126,6 +126,16 @@ const AUDIT_RULES: RuleDoc[] = [
     exampleSql: `{{ config(\n    post_hook="ALTER TABLE {{ this }} ADD PRIMARY KEY (order_id) RELY"\n) }}`,
   },
   {
+    id: "shared-column-description",
+    name: "Shared Column Name and Description, Meaning Not Confirmed",
+    severity: "warning",
+    category: "Data Integrity",
+    description: "With a manifest loaded: a column that carries the same name and the same description in two or more models. Empty descriptions never match; the text is compared exactly, never fuzzily. The check fails until every column of the group carries meta.shared_meaning_confirmed: true, and it never moves the score.",
+    impact: "Identical text is not proof of identical meaning or grain. A customer_id that is the billing account in one mart and the shopper in another joins silently into wrong, missing or fanned-out rows. The auditor never assumes the columns are the same concept; a human has to confirm it.",
+    remediation: "Ask the owners of the listed models whether the column is one concept. If it is, document it once with a doc block, add a relationships test and set the meta flag on each column; if it is not, give each column its own description or rename it.",
+    exampleSql: `columns:\n  - name: customer_id\n    description: "{{ doc('customer_id') }}"\n    meta:\n      shared_meaning_confirmed: true`,
+  },
+  {
     id: "recent-failure",
     name: "Recent Query Failures (7 Days)",
     severity: "error",

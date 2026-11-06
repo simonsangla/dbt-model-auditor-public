@@ -55,5 +55,26 @@ describe("manifest-parser (dbt-project-evaluator heuristics)", () => {
 
     // Naming violation
     expect(summary.namingViolations.some((v) => v.model === "legacy_bad_table")).toBe(true)
+
+    // No column shares a name and a description here
+    expect(summary.sharedColumnGroups).toEqual([])
+    expect(summary.sharedColumnCoveragePct).toBeNull()
+  })
+
+  it("reports shared-column groups and the coverage rate (confirmed groups over all groups)", () => {
+    const col = (description: string, confirmed = false) => ({ name: "customer_id", description, meta: confirmed ? { shared_meaning_confirmed: true } : undefined })
+    const m: DbtManifest = {
+      nodes: {
+        "model.p.fct_a": { unique_id: "model.p.fct_a", name: "fct_a", resource_type: "model", columns: { customer_id: col("The customer.", true), amount: { name: "amount", description: "Order amount." } } },
+        "model.p.dim_b": { unique_id: "model.p.dim_b", name: "dim_b", resource_type: "model", columns: { customer_id: col("The customer.", true) } },
+        "model.p.rpt_c": { unique_id: "model.p.rpt_c", name: "rpt_c", resource_type: "model", columns: { amount: { name: "amount", description: "Order amount." } } },
+      },
+    }
+    const summary = auditDbtManifest(m)
+    expect(summary.sharedColumnGroups.map((g) => [g.column, g.models, g.confirmed])).toEqual([
+      ["customer_id", ["fct_a", "dim_b"], true],
+      ["amount", ["fct_a", "rpt_c"], false],
+    ])
+    expect(summary.sharedColumnCoveragePct).toBe(50)
   })
 })
