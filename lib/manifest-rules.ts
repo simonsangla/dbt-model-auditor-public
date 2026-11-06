@@ -5,8 +5,9 @@
 // The wedge: joinRuntimeEvidence() and the freshness rule combine a manifest rule with
 // the Snowflake runtime evidence already collected by audit-engine.ts (LAST_ALTERED,
 // SHOW PRIMARY KEYS), which a manifest-only linter cannot see.
-import type { AuditFinding, ModelInfo } from "./audit-engine"
+import type { AuditFinding, AuditResult, ModelInfo } from "./audit-engine"
 import type { DbtFreshnessThreshold, DbtManifest, DbtManifestNode } from "./manifest-parser"
+import { SHARED_MEANING_META_KEY, sharedColumnGroups, type SharedColumnGroup } from "./column-semantics"
 
 /** dbt-project-evaluator default: models_fanout_threshold = 3. */
 export const FANOUT_THRESHOLD = 3
@@ -167,6 +168,51 @@ export function ruleStagingDependsOnStaging(m: DbtManifest): AuditFinding[] {
     }))
 }
 
+export const SHARED_COLUMN_RULE = "shared-column-description"
+
+function sharedColumnFixSnippet(g: SharedColumnGroup): string {
+  return [
+    `# Confirm with the owners of ${g.models.join(", ")} whether "${g.column}" is one concept.`,
+    `# If it is: document it once ({% docs ${g.column} %}), add a relationships test, and mark each column:`,
+    `columns:`,
+    `  - name: ${g.column}`,
+    `    description: "{{ doc('${g.column}') }}"`,
+    `    meta:`,
+    `      ${SHARED_MEANING_META_KEY}: true`,
+    `# If it is not: give each column its own description (grain, source, unit) or rename it.`,
+  ].join("\n")
+}
+
+/**
+ * Same column name + same description in several models. Fails (one warning per
+ * model) until every column of the group carries meta.shared_meaning_confirmed: true.
+ * Never moves the score (`unscored`): identical text is not evidence of identical meaning.
+ */
+export function ruleSharedColumnDescription(m: DbtManifest): AuditFinding[] {
+  return sharedColumnGroups(m)
+    .filter((g) => !g.confirmed)
+    .flatMap((g) =>
+      g.models.map((model) => {
+        const others = g.models.filter((x) => x !== model)
+        const pending = g.models.filter((x) => !g.confirmedBy.includes(x))
+        const origin = g.docBlock ? `, from doc block "${g.docBlock}"` : ""
+        return {
+          rule: SHARED_COLUMN_RULE,
+          severity: "warning" as const,
+          category: "Data Integrity" as const,
+          model,
+          unscored: true,
+          message: `Column "${g.column}" in "${model}" shares its name and description with ${others.join(", ")} — not confirmed as one concept`,
+          detail:
+            `Evidence: identical description "${g.description}"${origin}. Same name and text do not prove the same grain or meaning; ` +
+            `if they differ, joins on this column can return wrong, missing or fanned-out rows. ` +
+            `Fails until every column carries meta.${SHARED_MEANING_META_KEY}: true (pending: ${pending.join(", ")}). Does not change the score.`,
+          fixSnippet: sharedColumnFixSnippet(g),
+        }
+      }),
+    )
+}
+
 export function runManifestRules(m: DbtManifest, models: ModelInfo[] = []): AuditFinding[] {
   return [
     ...ruleMissingPkTests(m),
@@ -175,7 +221,27 @@ export function runManifestRules(m: DbtManifest, models: ModelInfo[] = []): Audi
     ...ruleRootModel(m),
     ...ruleMultipleSourcesJoined(m),
     ...ruleStagingDependsOnStaging(m),
+    ...ruleSharedColumnDescription(m),
   ]
+}
+
+/**
+ * Adds the shared-column findings of a manifest to an audit result (the `/` page
+ * with an uploaded manifest). Totals are recounted; the score is left untouched
+ * because every added finding is `unscored`. Without a manifest, the result is returned as is.
+ */
+export function withSharedColumnFindings(result: AuditResult, manifest: DbtManifest | null | undefined): AuditResult {
+  if (!manifest) return result
+  const added = ruleSharedColumnDescription(manifest)
+  if (added.length === 0) return result
+  const findings = [...result.findings, ...added]
+  return {
+    ...result,
+    findings,
+    errors: findings.filter((f) => f.severity === "error").length,
+    warnings: findings.filter((f) => f.severity === "warning").length,
+    infos: findings.filter((f) => f.severity === "info").length,
+  }
 }
 
 /**

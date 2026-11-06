@@ -22,6 +22,7 @@ import { HeaderMeta, HeaderChip } from "@/components/audit-header-meta"
 import { usePublicMode } from "@/lib/use-public-mode"
 import { replaySnapshot, SNAPSHOT_CONFIG, SNAPSHOT_MANIFEST, SNAPSHOT_SOURCE } from "@/lib/audit-snapshot"
 import { matchInventoryToManifest, scopeAuditToDbt } from "@/lib/dbt-identity"
+import { withSharedColumnFindings } from "@/lib/manifest-rules"
 import { DbtScopePanel } from "@/components/dbt-scope-panel"
 
 export default function Home() {
@@ -75,7 +76,10 @@ export default function Home() {
   const displayManifest = manifest ?? (isDemo ? SNAPSHOT_MANIFEST : null)
   // With a manifest that builds into this schema, the audit covers dbt models only.
   const scope = rawData && displayManifest ? matchInventoryToManifest(rawData.models, displayManifest, rawData.config) : null
-  const displayData = rawData && scope && scope.targetedCount > 0 ? scopeAuditToDbt(rawData, scope) : rawData
+  const scopedData = rawData && scope && scope.targetedCount > 0 ? scopeAuditToDbt(rawData, scope) : rawData
+  // Shared-column groups of the loaded manifest fail the audit (findings, totals, export) until
+  // confirmed in meta, without moving the score: identical text is not evidence of identical meaning.
+  const displayData = scopedData ? withSharedColumnFindings(scopedData, displayManifest) : scopedData
 
   const handleRepoSaved = (newRepo: string) => {
     if (config) {

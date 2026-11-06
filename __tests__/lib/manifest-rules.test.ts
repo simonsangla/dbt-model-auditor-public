@@ -10,14 +10,24 @@ import {
   ruleRootModel,
   ruleMultipleSourcesJoined,
   ruleStagingDependsOnStaging,
+  ruleSharedColumnDescription,
   runManifestRules,
   joinRuntimeEvidence,
+  withSharedColumnFindings,
+  SHARED_COLUMN_RULE,
 } from "@/lib/manifest-rules"
+import { SHARED_MEANING_META_KEY } from "@/lib/column-semantics"
+import { computeScore } from "@/lib/audit-engine"
 import { REVENUE_VARIANCE_MANIFEST } from "@/lib/revenue-variance-sample"
 import { SNAPSHOT_MANIFEST, replaySnapshot } from "@/lib/audit-snapshot"
 
 function model(name: string, deps: string[] = []): DbtManifestNode {
   return { unique_id: `model.p.${name}`, name, resource_type: "model", depends_on: { nodes: deps } }
+}
+/** A model whose columns all carry the same description; `confirmed` sets meta.shared_meaning_confirmed on them. */
+function documented(name: string, columns: string[], description: string, confirmed = false): DbtManifestNode {
+  const meta = confirmed ? { [SHARED_MEANING_META_KEY]: true } : undefined
+  return { ...model(name, ["source.p.raw.x"]), columns: Object.fromEntries(columns.map((c) => [c, { name: c, description, meta }])) }
 }
 function test(kind: string, on: string, column: string): DbtManifestNode {
   return {
@@ -135,6 +145,69 @@ describe("staging-depends-on-staging", () => {
   it("passes a mart built on staging", () => {
     const m = manifest([model("stg_a"), model("fct_b", ["model.p.stg_a"])])
     expect(ruleStagingDependsOnStaging(m)).toEqual([])
+  })
+})
+
+describe("shared-column-description: fails until confirmed in meta, never moves the score", () => {
+  const D = "Unique identifier of the customer."
+  it("fails with one warning per model when two models share name + description and nothing is confirmed", () => {
+    const fs = ruleSharedColumnDescription(manifest([documented("fct_a", ["customer_id"], D), documented("dim_b", ["customer_id"], D)]))
+    expect(rules(fs)).toEqual([`${SHARED_COLUMN_RULE}:dim_b`, `${SHARED_COLUMN_RULE}:fct_a`])
+    for (const f of fs) {
+      expect(f.severity).toBe("warning")
+      expect(f.category).toBe("Data Integrity")
+      expect(f.unscored).toBe(true)
+      expect(f.message).toMatch(/not confirmed/)
+      expect(f.detail).toContain(`meta.${SHARED_MEANING_META_KEY}: true`)
+      expect(f.detail).toContain("pending: fct_a, dim_b")
+      expect(f.fixSnippet).toContain(`${SHARED_MEANING_META_KEY}: true`)
+      expect(f.fixSnippet).not.toMatch(/DROP/i)
+      // Never asserts the columns are the same thing.
+      expect(`${f.message} ${f.detail}`).not.toMatch(/duplicate|same meaning|are the same concept/i)
+    }
+    expect(fs[0].message).toContain('shares its name and description with dim_b')
+  })
+  it("still fails when only one of the two columns is confirmed", () => {
+    const fs = ruleSharedColumnDescription(manifest([documented("fct_a", ["customer_id"], D, true), documented("dim_b", ["customer_id"], D)]))
+    expect(fs).toHaveLength(2)
+    expect(fs[0].detail).toContain("pending: dim_b")
+  })
+  it("passes once every column of the group is confirmed", () => {
+    expect(ruleSharedColumnDescription(manifest([documented("fct_a", ["customer_id"], D, true), documented("dim_b", ["customer_id"], D, true)]))).toEqual([])
+  })
+  it("fails again on all three models when a new unconfirmed model joins a confirmed group", () => {
+    const m = manifest([documented("fct_a", ["customer_id"], D, true), documented("dim_b", ["customer_id"], D, true), documented("rpt_c", ["customer_id"], D)])
+    expect(rules(ruleSharedColumnDescription(m))).toEqual([`${SHARED_COLUMN_RULE}:dim_b`, `${SHARED_COLUMN_RULE}:fct_a`, `${SHARED_COLUMN_RULE}:rpt_c`])
+  })
+  it("does not fail for empty descriptions, a single model, or different texts", () => {
+    expect(ruleSharedColumnDescription(manifest([documented("a", ["id"], ""), documented("b", ["id"], "")]))).toEqual([])
+    expect(ruleSharedColumnDescription(manifest([documented("a", ["id"], D)]))).toEqual([])
+    expect(ruleSharedColumnDescription(manifest([documented("a", ["id"], D), documented("b", ["id"], D + " (billing)")]))).toEqual([])
+  })
+  it("names the doc block in the evidence when the manifest carries one", () => {
+    const m = { ...manifest([documented("a", ["customer_id"], D), documented("b", ["customer_id"], D)]), docs: { "doc.p.c": { name: "customer_id", block_contents: `${D}\n` } } }
+    expect(ruleSharedColumnDescription(m)[0].detail).toContain('from doc block "customer_id"')
+  })
+  it("is part of runManifestRules and never changes the score", () => {
+    const m = manifest([documented("fct_a", ["customer_id"], D), documented("dim_b", ["customer_id"], D)])
+    const fs = runManifestRules(m)
+    expect(fs.filter((f) => f.rule === SHARED_COLUMN_RULE)).toHaveLength(2)
+    const scoredOnly = fs.filter((f) => f.rule !== SHARED_COLUMN_RULE)
+    expect(computeScore(fs, 2)).toBe(computeScore(scoredOnly, 2))
+  })
+  it("withSharedColumnFindings appends the failures to an audit result, recounts totals and keeps the score", () => {
+    const base = { totalModels: 2, errors: 0, warnings: 1, infos: 0, score: 85, checks: [], findings: [{ rule: "stale-model", severity: "warning" as const, message: "x", model: "FCT_A" }], models: [], config: { database: "D", schema: "S", warehouse: "W" }, runAt: "" }
+    const m = manifest([documented("fct_a", ["customer_id"], D), documented("dim_b", ["customer_id"], D)])
+    const out = withSharedColumnFindings(base, m)
+    expect(out.findings).toHaveLength(3)
+    expect(out.warnings).toBe(3)
+    expect(out.score).toBe(85)
+    expect(withSharedColumnFindings(base, null)).toBe(base)
+    expect(withSharedColumnFindings(base, manifest([model("a")]))).toBe(base)
+  })
+  it("yields nothing on both shipped samples: their shared column names have empty or differing descriptions", () => {
+    expect(ruleSharedColumnDescription(REVENUE_VARIANCE_MANIFEST)).toEqual([])
+    expect(ruleSharedColumnDescription(SNAPSHOT_MANIFEST)).toEqual([])
   })
 })
 

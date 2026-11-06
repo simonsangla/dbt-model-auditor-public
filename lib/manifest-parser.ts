@@ -3,6 +3,20 @@
  * A small subset of dbt-project-evaluator style checks (test/doc coverage, naming,
  * direct source references), computed from manifest.json with no dbt runtime.
  */
+import { sharedColumnGroups, sharedColumnCoveragePct, type SharedColumnGroup } from "./column-semantics"
+
+/** One column of a model's YAML. `meta` is free-form; see lib/column-semantics.ts for the key it reads. */
+export interface DbtManifestColumn {
+  name: string
+  description?: string
+  meta?: Record<string, unknown>
+}
+
+/** A `{% docs %}` block; its rendered contents equal the description of every column that references it. */
+export interface DbtManifestDoc {
+  name: string
+  block_contents: string
+}
 
 export interface DbtManifestNode {
   unique_id: string
@@ -20,7 +34,7 @@ export interface DbtManifestNode {
     nodes?: string[]
     macros?: string[]
   }
-  columns?: Record<string, { name: string; description?: string }>
+  columns?: Record<string, DbtManifestColumn>
   /** Test nodes only: the model the generic test is attached to. */
   attached_node?: string | null
   /** Test nodes only: generic test name (unique, not_null, ...) and its kwargs. */
@@ -54,6 +68,7 @@ export interface DbtManifest {
   nodes: Record<string, DbtManifestNode>
   sources?: Record<string, DbtManifestSource>
   exposures?: Record<string, DbtManifestExposure>
+  docs?: Record<string, DbtManifestDoc>
 }
 
 export interface ManifestAuditSummary {
@@ -64,6 +79,10 @@ export interface ManifestAuditSummary {
   docCoveragePct: number
   directSourceViolations: Array<{ model: string; source: string }>
   namingViolations: Array<{ model: string; reason: string }>
+  /** Columns sharing name + description across models; each group fails until every member is confirmed in meta. */
+  sharedColumnGroups: SharedColumnGroup[]
+  /** Coverage rate: confirmed groups over all groups (percent); null when there is no group. */
+  sharedColumnCoveragePct: number | null
 }
 
 const DBT_PREFIXES = ["stg_", "int_", "fct_", "dim_", "rpt_", "snap_", "base_", "v_", "agg_"]
@@ -119,6 +138,7 @@ export function auditDbtManifest(manifest: DbtManifest): ManifestAuditSummary {
 
   const totalModels = models.length
   const testedCount = models.filter((m) => modelTests.has(m.unique_id)).length
+  const shared = sharedColumnGroups(manifest)
 
   return {
     totalModels,
@@ -128,5 +148,7 @@ export function auditDbtManifest(manifest: DbtManifest): ManifestAuditSummary {
     docCoveragePct: totalModels > 0 ? Math.round((documentedCount / totalModels) * 100) : 0,
     directSourceViolations,
     namingViolations,
+    sharedColumnGroups: shared,
+    sharedColumnCoveragePct: sharedColumnCoveragePct(shared),
   }
 }
