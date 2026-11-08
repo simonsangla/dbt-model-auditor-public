@@ -97,19 +97,30 @@ export function ruleSourceFreshnessMissing(m: DbtManifest, models: ModelInfo[] =
     })
 }
 
-export function ruleFanOut(m: DbtManifest): AuditFinding[] {
-  const children = new Map<string, string[]>()
+/**
+ * Direct model children of each model id, read from every model's depends_on.nodes.
+ * Only `model.` parents are keyed; children keep manifest order, and a dependency listed
+ * twice is kept twice (dbt dedupes depends_on, hand-made manifests may not).
+ * Shared by the dependency-graph rules (fan-out, chained views).
+ */
+export function modelChildren(m: DbtManifest): Map<string, DbtManifestNode[]> {
+  const children = new Map<string, DbtManifestNode[]>()
   for (const n of modelsOf(m)) {
     for (const d of deps(n)) {
       if (!d.startsWith("model.")) continue
       if (!children.has(d)) children.set(d, [])
-      children.get(d)!.push(n.name)
+      children.get(d)!.push(n)
     }
   }
+  return children
+}
+
+export function ruleFanOut(m: DbtManifest): AuditFinding[] {
+  const children = modelChildren(m)
   return modelsOf(m)
     .filter((n) => (children.get(n.unique_id)?.length ?? 0) > FANOUT_THRESHOLD)
     .map((n) => {
-      const kids = children.get(n.unique_id)!
+      const kids = children.get(n.unique_id)!.map((c) => c.name)
       return {
         rule: "fan-out",
         severity: "warning" as const,
@@ -168,6 +179,80 @@ export function ruleStagingDependsOnStaging(m: DbtManifest): AuditFinding[] {
     }))
 }
 
+/** dbt-project-evaluator default: chained_views_threshold = 5. A chain of 5 or more is flagged. */
+export const CHAINED_VIEWS_THRESHOLD = 5
+export const CHAINED_VIEWS_RULE = "chained-views"
+
+/**
+ * Materializations recomputed every time a downstream query or build reads them: a view
+ * re-runs its SQL on each read, an ephemeral model is inlined into each consumer. Everything
+ * else breaks a chain: persisted models (table, incremental, materialized_view, dynamic_table,
+ * streaming_table), seeds, snapshots, sources, a missing or unknown materialization (real dbt
+ * manifests always carry the resolved value), and parents that are not models of the manifest.
+ */
+const RECOMPUTED_MATERIALIZATIONS = new Set(["view", "ephemeral"])
+
+function materialization(n: DbtManifestNode): string {
+  const v = n.config?.materialized
+  return typeof v === "string" ? v.trim().toLowerCase() : ""
+}
+
+function isRecomputed(n: DbtManifestNode): boolean {
+  return n.resource_type === "model" && RECOMPUTED_MATERIALIZATIONS.has(materialization(n))
+}
+
+/**
+ * Chains of views/ephemeral models: every query on the last model recomputes the whole chain.
+ * One finding per chain end (a recomputed model with no recomputed child), carrying the longest
+ * chain that ends there; equal-length paths resolve to the first parent in depends_on order.
+ * Never moves the score (`unscored`).
+ */
+export function ruleChainedViews(m: DbtManifest): AuditFinding[] {
+  const byId = new Map(modelsOf(m).map((n) => [n.unique_id, n]))
+  const children = modelChildren(m)
+  // Longest chain ending at each recomputed model, as the list of its models from the head.
+  const longest = new Map<string, DbtManifestNode[]>()
+  const visiting = new Set<string>()
+  const chainTo = (n: DbtManifestNode): DbtManifestNode[] => {
+    const known = longest.get(n.unique_id)
+    if (known) return known
+    visiting.add(n.unique_id)
+    let best: DbtManifestNode[] = []
+    for (const d of deps(n)) {
+      const p = byId.get(d)
+      // A parent still being visited closes a cycle (dbt forbids them): treat that edge as a break.
+      if (!p || !isRecomputed(p) || visiting.has(d)) continue
+      const c = chainTo(p)
+      if (c.length > best.length) best = c
+    }
+    visiting.delete(n.unique_id)
+    const chain = [...best, n]
+    longest.set(n.unique_id, chain)
+    return chain
+  }
+  return modelsOf(m)
+    .filter((n) => isRecomputed(n) && !(children.get(n.unique_id) ?? []).some(isRecomputed))
+    .map((n) => chainTo(n))
+    .filter((chain) => chain.length >= CHAINED_VIEWS_THRESHOLD)
+    .map((chain) => {
+      const end = chain[chain.length - 1]
+      const middle = chain[Math.floor((chain.length - 1) / 2)]
+      return {
+        rule: CHAINED_VIEWS_RULE,
+        severity: "warning" as const,
+        category: "Snowflake Cost" as const,
+        model: end.name,
+        unscored: true,
+        message: `Model "${end.name}" ends a chain of ${chain.length} views/ephemeral models (threshold ${CHAINED_VIEWS_THRESHOLD})`,
+        detail:
+          `Evidence: ${chain.map((c) => `${c.name} (${materialization(c)})`).join(" → ")}. ` +
+          `A view re-runs its query on every read and an ephemeral model is inlined into every consumer, ` +
+          `so each query on "${end.name}" recomputes the whole chain. Does not change the score.`,
+        fixSnippet: `-- Persist one model of the chain, e.g. in ${middle.name}.sql:\n{{ config(materialized='table') }}  -- or 'incremental'`,
+      }
+    })
+}
+
 export const SHARED_COLUMN_RULE = "shared-column-description"
 
 function sharedColumnFixSnippet(g: SharedColumnGroup): string {
@@ -222,6 +307,7 @@ export function runManifestRules(m: DbtManifest, models: ModelInfo[] = []): Audi
     ...ruleMultipleSourcesJoined(m),
     ...ruleStagingDependsOnStaging(m),
     ...ruleSharedColumnDescription(m),
+    ...ruleChainedViews(m),
   ]
 }
 
