@@ -18,7 +18,10 @@ Audit checks: `empty-model`, `stale-model` (base tables only), `missing-clusteri
 (>100 MB, no clustering key), `no-primary-key` (base tables, info only: Snowflake
 does not enforce keys), `recent-failure` and `slow-query` (both need
 `ACCOUNT_USAGE`). Manifest checks: test coverage, doc coverage, naming prefixes,
-non-staging models that depend directly on a source, and `shared-column-description`:
+non-staging models that depend directly on a source, `chained-views` (a chain of 5 or
+more consecutive views or ephemeral models: querying the last one recomputes the whole
+chain; one warning per chain end, reported with the longest chain, not counted in the
+score) and `shared-column-description`:
 columns with the same name and the same description in several models fail the audit
 (without moving the score) until every one of them carries
 `meta: { shared_meaning_confirmed: true }`; the auditor never assumes they mean the same thing.
