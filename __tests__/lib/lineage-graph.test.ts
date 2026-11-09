@@ -24,6 +24,40 @@ const manifest = {
 } as unknown as DbtManifest
 
 describe("buildLineageNodes", () => {
+  it("keeps same-named models from different packages as separate nodes", () => {
+    const homonyms = {
+      nodes: {
+        "model.pkg_a.orders": {
+          name: "orders",
+          resource_type: "model",
+          unique_id: "model.pkg_a.orders",
+          depends_on: { nodes: [] },
+        },
+        "model.pkg_b.orders": {
+          name: "orders",
+          resource_type: "model",
+          unique_id: "model.pkg_b.orders",
+          depends_on: { nodes: [] },
+        },
+        "model.pkg_a.report": {
+          name: "report",
+          resource_type: "model",
+          unique_id: "model.pkg_a.report",
+          depends_on: { nodes: ["model.pkg_a.orders"] },
+        },
+      },
+    } as unknown as DbtManifest
+
+    const { nodes } = buildLineageNodes([], [], homonyms)
+    expect(nodes.filter((n) => n.name === "orders").map((n) => n.id)).toEqual([
+      "model.pkg_a.orders",
+      "model.pkg_b.orders",
+    ])
+    const report = nodes.find((n) => n.name === "report")
+    expect(report?.dependencies).toEqual(["model.pkg_a.orders"])
+    expect(nodes.find((n) => n.id === "model.pkg_a.orders")?.dependents).toEqual([report?.id])
+  })
+
   it("counts info-only findings as info health and in stats", () => {
     const findings: AuditFinding[] = [
       { rule: "naming", severity: "info", model: "legacy_margin", message: "bad name", category: "dbt Architecture" } as AuditFinding,

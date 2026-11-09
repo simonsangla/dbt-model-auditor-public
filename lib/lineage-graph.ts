@@ -7,7 +7,7 @@ export type PipelineLayer = "sources" | "staging" | "intermediate" | "marts" | "
 export type NodeHealth = "healthy" | "info" | "warning" | "error"
 
 export interface LineageNode {
-  /** Internal key: lower-case model name, "source:<name>" for a dbt source, "exposure:<name>" for an exposure. */
+  /** Internal key: unique_id for colliding manifest models, otherwise a stable model name. */
   id: string
   name: string
   layer: PipelineLayer
@@ -50,6 +50,10 @@ export function exposureKey(name: string): string {
   return `exposure:${name.toLowerCase()}`
 }
 
+function modelKey(uniqueId: string): string {
+  return uniqueId.toLowerCase()
+}
+
 export function healthOf(findings: AuditFinding[]): NodeHealth {
   if (findings.some((f) => f.severity === "error")) return "error"
   if (findings.some((f) => f.severity === "warning")) return "warning"
@@ -67,6 +71,16 @@ export function buildLineageNodes(
   manifest?: DbtManifest | null,
 ): { nodes: LineageNode[]; stats: LineageStats } {
   const nodeMap = new Map<string, LineageNode>()
+  const manifestModels = Object.values(manifest?.nodes ?? {}).filter((n) => n.resource_type === "model")
+  const manifestNameCounts = new Map<string, number>()
+  for (const n of manifestModels) {
+    const name = n.name.toLowerCase()
+    manifestNameCounts.set(name, (manifestNameCounts.get(name) ?? 0) + 1)
+  }
+  const manifestIdsByUniqueId = new Map(
+    manifestModels.map((n) => [modelKey(n.unique_id), manifestNameCounts.get(n.name.toLowerCase())! > 1 ? modelKey(n.unique_id) : n.name.toLowerCase()]),
+  )
+  const warehouseIdsByName = new Map(models.map((m) => [m.name.toLowerCase(), m.name.toLowerCase()]))
 
   // 1. Sources from the manifest, keyed in the source namespace.
   if (manifest?.sources) {
@@ -80,7 +94,7 @@ export function buildLineageNodes(
   // dbt manifest uses lower case, so model nodes are keyed case-insensitively.
   for (const m of models) {
     const id = m.name.toLowerCase()
-    const node = emptyNode(id, m.name, detectLayer(id), "model")
+    const node = emptyNode(id, m.name, detectLayer(m.name), "model")
     node.kind = m.kind
     node.rows = m.rows ?? undefined
     node.bytes = m.rows === null ? undefined : m.bytes
@@ -92,18 +106,22 @@ export function buildLineageNodes(
   if (manifest?.nodes) {
     for (const n of Object.values(manifest.nodes)) {
       if (n.resource_type !== "model") continue
-      const id = n.name.toLowerCase()
+      const id = manifestIdsByUniqueId.get(modelKey(n.unique_id)) ?? n.name.toLowerCase()
       let node = nodeMap.get(id)
       if (!node) {
-        node = emptyNode(id, n.name, detectLayer(id), "model")
+        node = emptyNode(id, n.name, detectLayer(n.name), "model")
         nodeMap.set(id, node)
       }
       node.description = n.description
       for (const dep of n.depends_on?.nodes ?? []) {
+        const isSource = dep.startsWith("source.")
         const depName = dep.split(".").pop()?.toLowerCase()
         if (!depName) continue
-        const isSource = dep.startsWith("source.")
-        const depId = isSource ? sourceKey(depName) : depName
+        const depId = isSource
+          ? sourceKey(depName)
+          : manifestIdsByUniqueId.has(modelKey(dep))
+            ? manifestIdsByUniqueId.get(modelKey(dep))!
+            : warehouseIdsByName.get(depName) ?? modelKey(dep)
         if (depId === id || node.dependencies.includes(depId)) continue
         node.dependencies.push(depId)
         if (isSource && !nodeMap.has(depId)) {
@@ -121,7 +139,9 @@ export function buildLineageNodes(
     for (const dep of exp.depends_on?.nodes ?? []) {
       const depName = dep.split(".").pop()?.toLowerCase()
       if (!depName) continue
-      const depId = dep.startsWith("source.") ? sourceKey(depName) : depName
+      const depId = dep.startsWith("source.")
+        ? sourceKey(depName)
+        : manifestIdsByUniqueId.get(modelKey(dep)) ?? warehouseIdsByName.get(depName) ?? modelKey(dep)
       if (nodeMap.has(depId) && !node.dependencies.includes(depId)) node.dependencies.push(depId)
     }
     nodeMap.set(id, node)
@@ -139,8 +159,13 @@ export function buildLineageNodes(
   for (const finding of findings) {
     if (!finding.model) continue
     const key = finding.model.toLowerCase()
-    const node = nodeMap.get(key) ?? nodeMap.get(sourceKey(key))
-    if (node) node.findings.push(finding)
+    const source = key.startsWith("source:") ? nodeMap.get(key) : nodeMap.get(sourceKey(key))
+    if (source) {
+      source.findings.push(finding)
+      continue
+    }
+    const matching = nodesByDisplayName(nodeMap, key)
+    if (matching.length) matching.forEach((node) => node.findings.push(finding))
   }
   for (const node of nodeMap.values()) node.health = healthOf(node.findings)
 
@@ -156,6 +181,10 @@ export function buildLineageNodes(
       healthyCount: count("healthy"),
     },
   }
+}
+
+function nodesByDisplayName(nodeMap: Map<string, LineageNode>, name: string): LineageNode[] {
+  return Array.from(nodeMap.values()).filter((node) => node.type === "model" && node.name.toLowerCase() === name)
 }
 
 /** Model names reachable downstream of a node (transitive, each counted once). */
